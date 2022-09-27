@@ -44,11 +44,12 @@ impl Account {
     }
 
     pub fn dispute(&mut self, tx_id: TransactionId, disputed: Decimal) -> TransactionResult {
-        if self.past_disputes.contains(&tx_id) || self.finalized_disputes.contains(&tx_id) {
+        if self.past_disputes.contains(&tx_id) {
             return Err(RedisputedTransaction);
         }
         self.available -= disputed;
         self.held += disputed;
+        self.past_disputes.insert(tx_id);
         Ok(())
     }
 
