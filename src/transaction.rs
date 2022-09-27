@@ -1,8 +1,8 @@
-use std::error::Error;
 use crate::account::AccountId;
 use crate::transaction::TransactionType::{Chargeback, Deposit, Dispute, Resolve, Withdrawal};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use RowParsingError::{NegativeAmount, UndefinedAmount, UnknownTransactionType};
@@ -60,20 +60,29 @@ pub(crate) enum TransactionFailure {
 impl Display for TransactionFailure {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            TransactionFailure::InsufficientFunds(account_id, tx_id, amount) =>
-                write!(f, "Transaction #{} for account #{} can't withdraw ${} due to insufficient funds", tx_id, account_id, amount),
-            TransactionFailure::NonExistentTransaction(tx_id) =>
-                write!(f, "Transaction #{} not found", tx_id),
-            TransactionFailure::NonExistentAccount(account_id) =>
-                write!(f, "Account #{} not found", account_id),
-            TransactionFailure::UndisputedTransaction(tx_id) =>
-                write!(f, "No previously disputed transaction #{} found", tx_id),
-            TransactionFailure::RedisputedTransaction(tx_id) =>
-                write!(f, "Transaction #{} has already been disputed", tx_id),
-            TransactionFailure::FinalizedDispute(tx_id) =>
-                write!(f, "Transaction #{} dispute has already ended", tx_id),
-            TransactionFailure::InvalidTransactionReference(a, b) =>
-                write!(f, "{:?} transaction cannot reference {:?}", a, b),
+            TransactionFailure::InsufficientFunds(account_id, tx_id, amount) => write!(
+                f,
+                "Transaction #{} for account #{} can't withdraw ${} due to insufficient funds",
+                tx_id, account_id, amount
+            ),
+            TransactionFailure::NonExistentTransaction(tx_id) => {
+                write!(f, "Transaction #{} not found", tx_id)
+            }
+            TransactionFailure::NonExistentAccount(account_id) => {
+                write!(f, "Account #{} not found", account_id)
+            }
+            TransactionFailure::UndisputedTransaction(tx_id) => {
+                write!(f, "No previously disputed transaction #{} found", tx_id)
+            }
+            TransactionFailure::RedisputedTransaction(tx_id) => {
+                write!(f, "Transaction #{} has already been disputed", tx_id)
+            }
+            TransactionFailure::FinalizedDispute(tx_id) => {
+                write!(f, "Transaction #{} dispute has already ended", tx_id)
+            }
+            TransactionFailure::InvalidTransactionReference(a, b) => {
+                write!(f, "{:?} transaction cannot reference {:?}", a, b)
+            }
         }
     }
 }

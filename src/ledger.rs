@@ -37,9 +37,9 @@ impl Ledger {
             // Get the existing account or create a new one
             Deposit(_) => accounts.entry(*account_id).or_insert(Account::new()),
             // Get the existing account or fail immediately
-            Withdrawal(_) | Dispute | Resolve | Chargeback => {
-                accounts.get_mut(account_id).ok_or(NonExistentAccount(*account_id))?
-            }
+            Withdrawal(_) | Dispute | Resolve | Chargeback => accounts
+                .get_mut(account_id)
+                .ok_or(NonExistentAccount(*account_id))?,
         };
 
         // If we're dealing with a deposit or a withdrawal, we don't need to reference a

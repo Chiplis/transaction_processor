@@ -39,7 +39,12 @@ impl Account {
     }
 
     // A withdrawal can fail if the user tries to withdraw more funds than they have available
-    pub fn withdraw(&mut self, account_id: AccountId, tx_id: TransactionId, withdraw: Decimal) -> TransactionResult {
+    pub fn withdraw(
+        &mut self,
+        account_id: AccountId,
+        tx_id: TransactionId,
+        withdraw: Decimal,
+    ) -> TransactionResult {
         if self.available() < withdraw {
             return Err(InsufficientFunds(account_id, tx_id, withdraw));
         }

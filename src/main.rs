@@ -4,7 +4,7 @@ mod transaction;
 
 use crate::account::{Account, AccountId};
 use crate::ledger::Ledger;
-use crate::transaction::{Transaction};
+use crate::transaction::Transaction;
 use csv::{Reader, ReaderBuilder, Trim};
 use std::collections::HashMap;
 use std::env;
@@ -72,10 +72,10 @@ fn process_csv(
 mod tests {
     use crate::{process_csv, AccountId};
     use csv::{ReaderBuilder, Trim};
+    use rust_decimal::Decimal;
     use std::collections::HashMap;
     use std::error::Error;
     use std::path::Path;
-    use rust_decimal::Decimal;
 
     #[test]
     fn process_csv_parses_string_correctly() -> Result<(), Box<dyn Error>> {
@@ -98,12 +98,15 @@ mod tests {
         let (accounts, errors) = process_csv(csv, accounts);
         let (first_account, second_account) = (
             accounts.get(&AccountId(1)).unwrap(),
-            accounts.get(&AccountId(2)).unwrap()
+            accounts.get(&AccountId(2)).unwrap(),
         );
         assert_eq!(first_account.total(), Decimal::from_str_exact("0.5")?);
         assert_eq!(second_account.total(), Decimal::from_str_exact("2.1")?);
         assert_eq!(errors.len(), 2);
-        assert_eq!(errors[0].to_string(), "Transaction #5 for account #2 can't withdraw $3 due to insufficient funds");
+        assert_eq!(
+            errors[0].to_string(),
+            "Transaction #5 for account #2 can't withdraw $3 due to insufficient funds"
+        );
         assert_eq!(errors[1].to_string(), "Transaction #5 not found");
         Ok(())
     }
@@ -119,12 +122,15 @@ mod tests {
         let (accounts, errors) = process_csv(csv, accounts);
         let (first_account, second_account) = (
             accounts.get(&AccountId(1)).unwrap(),
-            accounts.get(&AccountId(2)).unwrap()
+            accounts.get(&AccountId(2)).unwrap(),
         );
         assert_eq!(first_account.total(), Decimal::from_str_exact("1.5001")?);
         assert_eq!(second_account.total(), Decimal::from_str_exact("2.1")?);
         assert_eq!(errors.len(), 2);
-        assert_eq!(errors[0].to_string(), "Transaction #5 for account #2 can't withdraw $3 due to insufficient funds");
+        assert_eq!(
+            errors[0].to_string(),
+            "Transaction #5 for account #2 can't withdraw $3 due to insufficient funds"
+        );
         assert_eq!(errors[1].to_string(), "Transaction #5 not found");
         Ok(())
     }
