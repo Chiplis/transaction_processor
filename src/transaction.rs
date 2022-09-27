@@ -4,6 +4,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fmt::Formatter;
+use RowParsingError::{UndefinedAmount, UnknownTransactionType};
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub(crate) struct TransactionId(u32);
@@ -35,9 +36,9 @@ struct TransactionRow {
     #[serde(rename = "type")]
     transaction_type: String,
     #[serde(rename = "client")]
-    client_id: u16,
+    account_id: AccountId,
     #[serde(rename = "tx")]
-    transaction_id: u32,
+    transaction_id: TransactionId,
     amount: Option<Decimal>,
 }
 
@@ -53,10 +54,16 @@ pub(crate) enum TransactionFailure {
 
 pub(crate) type TransactionResult = Result<(), TransactionFailure>;
 
-struct RowParsingError(String);
+enum RowParsingError {
+    UnknownTransactionType(String),
+    UndefinedAmount
+}
 impl fmt::Display for RowParsingError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        match self {
+            UnknownTransactionType(unknown_type) => write!(f, "{} is an unknown type", unknown_type),
+            UndefinedAmount => write!(f, "Transaction requires a defined amount")
+        }
     }
 }
 
@@ -66,29 +73,23 @@ impl TryFrom<TransactionRow> for Transaction {
     fn try_from(row: TransactionRow) -> Result<Self, Self::Error> {
         let TransactionRow {
             transaction_type,
-            client_id: account_id,
+            account_id,
             transaction_id,
             amount,
         } = row;
 
-        let amount_missing = format!(
-            "'{:?}' transactions require a defined amount",
-            transaction_type
-        );
-        let unknown_type = format!("'{:?}' is an unknown transaction type", transaction_type);
-
-        let details = match transaction_type.as_str() {
-            "deposit" => Deposit(amount.ok_or(RowParsingError(amount_missing))?),
-            "withdrawal" => Withdrawal(amount.ok_or(RowParsingError(amount_missing))?),
+        let transaction_type = match transaction_type.as_str() {
+            "deposit" => Deposit(amount.ok_or(UndefinedAmount)?),
+            "withdrawal" => Withdrawal(amount.ok_or(UndefinedAmount)?),
             "dispute" => Dispute,
             "resolve" => Resolve,
             "chargeback" => Chargeback,
-            _ => return Err(RowParsingError(unknown_type)),
+            unknown_type => return Err(UnknownTransactionType(unknown_type.to_string())),
         };
         Ok(Transaction {
-            transaction_type: details,
-            transaction_id: TransactionId(transaction_id),
-            account_id: AccountId(account_id),
+            transaction_type,
+            transaction_id,
+            account_id,
         })
     }
 }
