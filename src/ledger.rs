@@ -39,9 +39,13 @@ impl Ledger {
         };
 
         if let Withdrawal(withdrawal) = transaction_type {
-            return account.withdraw(*withdrawal);
+            account.withdraw(*withdrawal)?;
+            self.transactions.insert(*transaction_id, transaction);
+            return Ok(())
         } else if let Deposit(deposit) = transaction_type {
-            return account.deposit(*deposit);
+            account.deposit(*deposit)?;
+            self.transactions.insert(*transaction_id, transaction);
+            return Ok(())
         }
 
         let referenced_transaction_type = self
