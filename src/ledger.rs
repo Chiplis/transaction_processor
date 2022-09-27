@@ -60,7 +60,7 @@ impl Ledger {
             .unwrap_or(Err(NonExistentTransaction))?
             .transaction_type;
 
-        self.apply_transaction_to_account(
+        self.handle_referenced_transaction(
             transaction_type,
             referenced_transaction_type,
             transaction_id,
@@ -71,7 +71,7 @@ impl Ledger {
         Ok(())
     }
 
-    fn apply_transaction_to_account(
+    fn handle_referenced_transaction(
         &mut self,
         original_transaction_type: &TransactionType,
         referenced_transaction_type: TransactionType,
