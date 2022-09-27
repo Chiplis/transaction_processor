@@ -15,7 +15,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args = &env::args().collect::<Vec<String>>();
 
     if args.len() != 2 {
-        Err(format!("Expected 1 argument for CSV input, got {}", args.len() - 1))?
+        Err(format!(
+            "Expected 1 argument for CSV input, got {}",
+            args.len() - 1
+        ))?
     }
 
     let mut csv = ReaderBuilder::new()

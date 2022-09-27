@@ -4,7 +4,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fmt::Formatter;
-use RowParsingError::{UndefinedAmount, UnknownTransactionType};
+use RowParsingError::{NegativeAmount, UndefinedAmount, UnknownTransactionType};
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub(crate) struct TransactionId(u32);
@@ -14,6 +14,19 @@ impl fmt::Display for TransactionId {
     }
 }
 
+// This struct defines all the fields we can find in the parsed CSV
+#[derive(Debug, Serialize, Deserialize)]
+struct TransactionRow {
+    #[serde(rename = "type")]
+    transaction_type: String,
+    #[serde(rename = "client")]
+    account_id: AccountId,
+    #[serde(rename = "tx")]
+    transaction_id: TransactionId,
+    amount: Option<Decimal>,
+}
+
+// TransactionRow is converted into Transaction, which only contains fields available in every transaction type
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(try_from = "TransactionRow")]
 pub(crate) struct Transaction {
@@ -31,17 +44,6 @@ pub(crate) enum TransactionType {
     Chargeback,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct TransactionRow {
-    #[serde(rename = "type")]
-    transaction_type: String,
-    #[serde(rename = "client")]
-    account_id: AccountId,
-    #[serde(rename = "tx")]
-    transaction_id: TransactionId,
-    amount: Option<Decimal>,
-}
-
 pub(crate) enum TransactionFailure {
     InsufficientFunds,
     NonExistentTransaction,
@@ -49,14 +51,19 @@ pub(crate) enum TransactionFailure {
     UndisputedTransaction,
     RedisputedTransaction,
     FinalizedDispute,
+    // An invalid transaction reference happens when you attempt to dispute/resolve/chargeback
+    // a transaction which is NOT a deposit
     InvalidTransactionReference(TransactionType, TransactionType),
 }
 
+// The result of a transaction is either an empty type, meaning the transaction completed successfully,
+// or a particular transaction failure reason
 pub(crate) type TransactionResult = Result<(), TransactionFailure>;
 
 enum RowParsingError {
     UnknownTransactionType(String),
     UndefinedAmount,
+    NegativeAmount,
 }
 impl fmt::Display for RowParsingError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -65,6 +72,7 @@ impl fmt::Display for RowParsingError {
                 write!(f, "{} is an unknown type", unknown_type)
             }
             UndefinedAmount => write!(f, "Transaction requires a defined amount"),
+            NegativeAmount => write!(f, "Transaction requires a positive amount"),
         }
     }
 }
@@ -80,9 +88,14 @@ impl TryFrom<TransactionRow> for Transaction {
             amount,
         } = row;
 
+        let amount = match amount {
+            Some(value) => if value.is_sign_negative() { Err(NegativeAmount) } else { Ok(value) },
+            None => Err(UndefinedAmount)
+        };
+
         let transaction_type = match transaction_type.as_str() {
-            "deposit" => Deposit(amount.ok_or(UndefinedAmount)?),
-            "withdrawal" => Withdrawal(amount.ok_or(UndefinedAmount)?),
+            "deposit" => Deposit(amount?),
+            "withdrawal" => Withdrawal(amount?),
             "dispute" => Dispute,
             "resolve" => Resolve,
             "chargeback" => Chargeback,

@@ -32,8 +32,10 @@ impl Account {
         }
     }
 
+    // The deposit can never fail, because we're only adding funds to the user's account
     pub fn deposit(&mut self, deposit: Decimal) -> TransactionResult {
-        Ok(self.available += deposit)
+        self.available += deposit;
+        Ok(())
     }
 
     pub fn withdraw(&mut self, withdraw: Decimal) -> TransactionResult {
