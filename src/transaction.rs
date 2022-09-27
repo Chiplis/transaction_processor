@@ -1,9 +1,9 @@
+use crate::account::AccountId;
 use crate::transaction::TransactionType::{Chargeback, Deposit, Dispute, Resolve, Withdrawal};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fmt::Formatter;
-use crate::account::AccountId;
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub(crate) struct TransactionId(u32);
@@ -78,14 +78,8 @@ impl TryFrom<TransactionRow> for Transaction {
         let unknown_type = format!("'{:?}' is an unknown transaction type", transaction_type);
 
         let details = match transaction_type.as_str() {
-            "deposit" => {
-                let amount = amount.ok_or(RowParsingError(amount_missing))?;
-                Deposit(amount)
-            }
-            "withdrawal" => {
-                let amount = amount.ok_or(RowParsingError(amount_missing))?;
-                Withdrawal(amount)
-            }
+            "deposit" => Deposit(amount.ok_or(RowParsingError(amount_missing))?),
+            "withdrawal" => Withdrawal(amount.ok_or(RowParsingError(amount_missing))?),
             "dispute" => Dispute,
             "resolve" => Resolve,
             "chargeback" => Chargeback,

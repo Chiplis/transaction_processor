@@ -3,10 +3,10 @@ use crate::transaction::TransactionFailure::{
 };
 use crate::transaction::{TransactionId, TransactionResult};
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fmt;
 use std::fmt::Formatter;
-use serde::{Serialize, Deserialize};
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub(crate) struct AccountId(pub u16);

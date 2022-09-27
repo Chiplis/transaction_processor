@@ -1,16 +1,16 @@
+use crate::account::AccountId;
 use crate::transaction::TransactionFailure::{
     InvalidTransactionReference, NonExistentAccount, NonExistentTransaction,
 };
 use crate::transaction::TransactionType::{Deposit, Withdrawal};
 use crate::transaction::{TransactionId, TransactionResult, TransactionType};
 use crate::{Account, Transaction};
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use TransactionType::{Chargeback, Dispute, Resolve};
-use crate::account::AccountId;
 
 #[derive(Default)]
 pub(crate) struct Ledger {
-    transactions: HashMap<TransactionId, Transaction>
+    transactions: HashMap<TransactionId, Transaction>,
 }
 
 impl Ledger {
