@@ -32,8 +32,8 @@ impl Account {
         }
     }
 
-    pub fn deposit(&mut self, deposit: Decimal) {
-        self.available += deposit;
+    pub fn deposit(&mut self, deposit: Decimal) -> TransactionResult {
+        Ok(self.available += deposit)
     }
 
     pub fn withdraw(&mut self, withdraw: Decimal) -> TransactionResult {

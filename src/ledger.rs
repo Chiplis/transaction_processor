@@ -73,7 +73,7 @@ impl Ledger {
         match (original_transaction_type, referenced_transaction_type) {
             (Withdrawal(withdrawal), _) => account.withdraw(*withdrawal),
 
-            (Deposit(deposit), _) => Ok(account.deposit(*deposit)),
+            (Deposit(deposit), _) => account.deposit(*deposit),
 
             (Dispute, Deposit(disputed_amount)) => {
                 account.dispute(*transaction_id, disputed_amount)
