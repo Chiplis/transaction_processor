@@ -38,17 +38,19 @@ impl Ledger {
             }
         };
 
-        let referenced_transaction_type = if let Chargeback | Resolve | Dispute = transaction_type {
-            self.transactions
-                .get(transaction_id)
-                .map(|tx| match &tx.transaction_type {
-                    Deposit(_) => Ok(tx),
-                    &invalid => Err(InvalidTransactionReference(*transaction_type, invalid)),
-                })
-                .unwrap_or(Err(NonExistentTransaction))
-        } else {
-            Ok(&transaction)
-        }?.transaction_type;
+        let referenced_transaction_type =
+            if let Chargeback | Resolve | Dispute = transaction_type {
+                self.transactions
+                    .get(transaction_id)
+                    .map(|tx| match &tx.transaction_type {
+                        Deposit(_) => Ok(tx),
+                        &invalid => Err(InvalidTransactionReference(*transaction_type, invalid)),
+                    })
+                    .unwrap_or(Err(NonExistentTransaction))
+            } else {
+                Ok(&transaction)
+            }?
+            .transaction_type;
 
         self.apply_transaction_to_account(
             transaction_type,
