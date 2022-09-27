@@ -56,13 +56,15 @@ pub(crate) type TransactionResult = Result<(), TransactionFailure>;
 
 enum RowParsingError {
     UnknownTransactionType(String),
-    UndefinedAmount
+    UndefinedAmount,
 }
 impl fmt::Display for RowParsingError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            UnknownTransactionType(unknown_type) => write!(f, "{} is an unknown type", unknown_type),
-            UndefinedAmount => write!(f, "Transaction requires a defined amount")
+            UnknownTransactionType(unknown_type) => {
+                write!(f, "{} is an unknown type", unknown_type)
+            }
+            UndefinedAmount => write!(f, "Transaction requires a defined amount"),
         }
     }
 }

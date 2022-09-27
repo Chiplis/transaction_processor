@@ -38,18 +38,26 @@ impl Ledger {
             }
         };
 
-        let referenced_transaction_type =
-            if let Chargeback | Resolve | Dispute = transaction_type {
-                self.transactions
-                    .get(transaction_id)
-                    .map(|tx| match &tx.transaction_type {
-                        Deposit(_) => Ok(tx),
-                        &invalid => Err(InvalidTransactionReference(*transaction_type, invalid)),
-                    })
-                    .unwrap_or(Err(NonExistentTransaction))
-            } else {
-                Ok(&transaction)
-            }?
+        if let Withdrawal(withdrawal) = transaction_type {
+            return account.withdraw(*withdrawal);
+        } else if let Deposit(deposit) = transaction_type {
+            return account.deposit(*deposit);
+        }
+
+        let referenced_transaction_type = self
+            .transactions
+            .get(transaction_id)
+            .map(|ref_tx| {
+                if let Deposit(_) = ref_tx.transaction_type {
+                    Ok(ref_tx)
+                } else {
+                    Err(InvalidTransactionReference(
+                        *transaction_type,
+                        ref_tx.transaction_type,
+                    ))
+                }
+            })
+            .unwrap_or(Err(NonExistentTransaction))?
             .transaction_type;
 
         self.apply_transaction_to_account(
@@ -71,10 +79,6 @@ impl Ledger {
         account: &mut Account,
     ) -> TransactionResult {
         match (original_transaction_type, referenced_transaction_type) {
-            (Withdrawal(withdrawal), _) => account.withdraw(*withdrawal),
-
-            (Deposit(deposit), _) => account.deposit(*deposit),
-
             (Dispute, Deposit(disputed_amount)) => {
                 account.dispute(*transaction_id, disputed_amount)
             }
