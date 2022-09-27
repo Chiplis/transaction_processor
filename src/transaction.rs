@@ -3,13 +3,22 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fmt::Formatter;
+use crate::account::AccountId;
+
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub(crate) struct TransactionId(u32);
+impl fmt::Display for TransactionId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(try_from = "TransactionRow")]
 pub(crate) struct Transaction {
     pub(crate) transaction_type: TransactionType,
-    pub account_id: u16,
-    pub transaction_id: u32,
+    pub account_id: AccountId,
+    pub transaction_id: TransactionId,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
@@ -57,7 +66,7 @@ impl TryFrom<TransactionRow> for Transaction {
     fn try_from(row: TransactionRow) -> Result<Self, Self::Error> {
         let TransactionRow {
             transaction_type,
-            client_id,
+            client_id: account_id,
             transaction_id,
             amount,
         } = row;
@@ -84,8 +93,8 @@ impl TryFrom<TransactionRow> for Transaction {
         };
         Ok(Transaction {
             transaction_type: details,
-            transaction_id,
-            account_id: client_id,
+            transaction_id: TransactionId(transaction_id),
+            account_id: AccountId(account_id),
         })
     }
 }

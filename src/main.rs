@@ -2,7 +2,7 @@ mod account;
 mod ledger;
 mod transaction;
 
-use crate::account::Account;
+use crate::account::{Account, AccountId};
 use crate::ledger::Ledger;
 use crate::transaction::Transaction;
 use csv::{ReaderBuilder, Trim};
@@ -25,7 +25,7 @@ dispute, 2, 5";
         .from_reader(data.as_bytes());
 
     let mut ledger = Ledger::new();
-    let accounts: &mut HashMap<u16, Account> = &mut HashMap::new();
+    let accounts: &mut HashMap<AccountId, Account> = &mut HashMap::new();
 
     for row in csv.deserialize::<Transaction>() {
         let transaction = row.unwrap();

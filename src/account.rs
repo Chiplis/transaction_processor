@@ -1,16 +1,27 @@
 use crate::transaction::TransactionFailure::{
     FinalizedDispute, InsufficientFunds, RedisputedTransaction, UndisputedTransaction,
 };
-use crate::transaction::{TransactionResult, TransactionType};
+use crate::transaction::{TransactionId, TransactionResult};
 use rust_decimal::Decimal;
 use std::collections::HashSet;
+use std::fmt;
+use std::fmt::Formatter;
+use serde::{Serialize, Deserialize};
+
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub(crate) struct AccountId(pub u16);
+impl fmt::Display for AccountId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Default, Debug)]
 pub(crate) struct Account {
     available: Decimal,
     held: Decimal,
-    past_disputes: HashSet<u32>,
-    finalized_disputes: HashSet<u32>,
+    past_disputes: HashSet<TransactionId>,
+    finalized_disputes: HashSet<TransactionId>,
     pub(crate) locked: bool,
 }
 
@@ -32,7 +43,7 @@ impl Account {
         Ok(self.available -= withdraw)
     }
 
-    pub fn dispute(&mut self, tx_id: u32, disputed: Decimal) -> TransactionResult {
+    pub fn dispute(&mut self, tx_id: TransactionId, disputed: Decimal) -> TransactionResult {
         if self.past_disputes.contains(&tx_id) || self.finalized_disputes.contains(&tx_id) {
             return Err(RedisputedTransaction);
         }
@@ -41,7 +52,7 @@ impl Account {
         Ok(())
     }
 
-    pub fn resolve(&mut self, tx_id: u32, resolved: Decimal) -> TransactionResult {
+    pub fn resolve(&mut self, tx_id: TransactionId, resolved: Decimal) -> TransactionResult {
         if self.finalized_disputes.contains(&tx_id) {
             return Err(FinalizedDispute);
         } else if !self.past_disputes.contains(&tx_id) {
@@ -53,7 +64,7 @@ impl Account {
         Ok(())
     }
 
-    pub fn chargeback(&mut self, tx_id: u32, chargeback: Decimal) -> TransactionResult {
+    pub fn chargeback(&mut self, tx_id: TransactionId, chargeback: Decimal) -> TransactionResult {
         if self.finalized_disputes.contains(&tx_id) {
             return Err(FinalizedDispute);
         } else if !self.past_disputes.contains(&tx_id) {

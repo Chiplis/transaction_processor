@@ -1,16 +1,16 @@
 use crate::transaction::TransactionFailure::{
-    InsufficientFunds, InvalidTransactionReference, NonExistentAccount, NonExistentTransaction,
-    RedisputedTransaction, UndisputedTransaction,
+    InvalidTransactionReference, NonExistentAccount, NonExistentTransaction,
 };
 use crate::transaction::TransactionType::{Deposit, Withdrawal};
-use crate::transaction::{TransactionFailure, TransactionResult, TransactionType};
+use crate::transaction::{TransactionId, TransactionResult, TransactionType};
 use crate::{Account, Transaction};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 use TransactionType::{Chargeback, Dispute, Resolve};
+use crate::account::AccountId;
 
 #[derive(Default)]
 pub(crate) struct Ledger {
-    transactions: HashMap<u32, Transaction>,
+    transactions: HashMap<TransactionId, Transaction>,
 }
 
 impl Ledger {
@@ -22,7 +22,7 @@ impl Ledger {
 
     pub fn process_transaction(
         &mut self,
-        accounts: &mut HashMap<u16, Account>,
+        accounts: &mut HashMap<AccountId, Account>,
         transaction: Transaction,
     ) -> TransactionResult {
         let Transaction {
@@ -40,7 +40,7 @@ impl Ledger {
                 })
                 .unwrap_or(Err(NonExistentTransaction))
         } else {
-            Ok(original_transaction)
+            Ok(&transaction)
         }?;
 
         let account = match transaction_type {
@@ -65,7 +65,7 @@ impl Ledger {
         &mut self,
         original_tx: &TransactionType,
         referenced_tx: TransactionType,
-        transaction_id: &u32,
+        transaction_id: &TransactionId,
         account: &mut Account,
     ) -> TransactionResult {
         match (original_tx, referenced_tx) {
