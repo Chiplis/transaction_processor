@@ -7,22 +7,22 @@ use crate::ledger::Ledger;
 use crate::transaction::Transaction;
 use csv::{ReaderBuilder, Trim};
 use std::collections::HashMap;
+use std::env;
+use std::error::Error;
+use std::path::Path;
 
-fn main() {
-    let data = "
-type,client,tx,amount
-deposit,1,1,1.0001
-deposit, 2, 2, 2.1000
-deposit, 1, 3, 2.0
-withdrawal, 1, 4, 1.5
-withdrawal, 2, 5, 3.0,
-dispute, 2, 5";
+fn main() -> Result<(), Box<dyn Error>> {
+    let args = &env::args().collect::<Vec<String>>();
+
+    if args.len() != 2 {
+        Err(format!("Expected 1 argument for CSV input, got {}", args.len() - 1))?
+    }
 
     let mut csv = ReaderBuilder::new()
         .has_headers(true)
         .trim(Trim::All)
         .flexible(true)
-        .from_reader(data.as_bytes());
+        .from_path(Path::new(&args[1]))?;
 
     let mut ledger = Ledger::new();
     let accounts: &mut HashMap<AccountId, Account> = &mut HashMap::new();
@@ -42,4 +42,5 @@ dispute, 2, 5";
             account.locked()
         );
     });
+    Ok(())
 }
