@@ -1,6 +1,6 @@
 mod account;
-mod transaction;
 mod ledger;
+mod transaction;
 
 use crate::account::Account;
 use crate::ledger::Ledger;
@@ -34,6 +34,12 @@ dispute, 2, 5";
 
     println!("client,available,held,total,locked");
     accounts.iter().for_each(|(client, account)| {
-        println!("{client},{},{},{},{}", account.available(), account.held(), account.total(), account.locked);
+        println!(
+            "{client},{},{},{},{}",
+            account.available(),
+            account.held(),
+            account.total(),
+            account.locked
+        );
     });
 }

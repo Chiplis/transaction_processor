@@ -1,14 +1,16 @@
+use crate::transaction::TransactionFailure::{
+    InsufficientFunds, InvalidTransactionReference, NonExistentAccount, NonExistentTransaction,
+    RedisputedTransaction, UndisputedTransaction,
+};
+use crate::transaction::TransactionType::{Deposit, Withdrawal};
+use crate::transaction::{TransactionFailure, TransactionResult, TransactionType};
+use crate::{Account, Transaction};
 use std::collections::{HashMap, HashSet};
 use TransactionType::{Chargeback, Dispute, Resolve};
-use crate::{Account, Transaction};
-use crate::transaction::TransactionFailure::{AlreadyDisputedTransaction, InsufficientFunds, InvalidTransactionType, NonExistentAccount, NonExistentTransaction, UndisputedTransaction};
-use crate::transaction::{TransactionFailure, TransactionResult, TransactionType};
-use crate::transaction::TransactionType::{Deposit, Withdrawal};
 
 #[derive(Default)]
 pub(crate) struct Ledger {
     transactions: HashMap<u32, Transaction>,
-    disputed: HashSet<u32>,
 }
 
 impl Ledger {
@@ -29,7 +31,17 @@ impl Ledger {
             transaction_id,
         } = &transaction;
 
-        let referenced_tx = self.get_referenced_transaction(&transaction)?;
+        let referenced_tx = if let Chargeback | Resolve | Dispute = transaction_type {
+            self.transactions
+                .get(transaction_id)
+                .map(|tx| match &tx.transaction_type {
+                    Deposit(_) => Ok(tx),
+                    &invalid => Err(InvalidTransactionReference(Dispute, invalid)),
+                })
+                .unwrap_or(Err(NonExistentTransaction))
+        } else {
+            Ok(original_transaction)
+        }?;
 
         let account = match transaction_type {
             Deposit(_) => accounts.entry(*account_id).or_insert(Account::new()),
@@ -57,69 +69,23 @@ impl Ledger {
         account: &mut Account,
     ) -> TransactionResult {
         match (original_tx, referenced_tx) {
-            (Withdrawal(withdrawal), _) => {
-                account.withdraw(*withdrawal)
-            }
+            (Withdrawal(withdrawal), _) => account.withdraw(*withdrawal),
 
             (Deposit(deposit), _) => Ok(account.deposit(*deposit)),
 
             (Dispute, Deposit(disputed_amount)) => {
-                self.disputed.insert(*transaction_id);
-                account.dispute(disputed_amount);
-                Ok(())
+                account.dispute(*transaction_id, disputed_amount)
             }
 
             (Resolve, Deposit(resolved_amount)) => {
-                account.resolve(resolved_amount);
-                Ok(())
+                account.resolve(*transaction_id, resolved_amount)
             }
 
             (Chargeback, Deposit(chargeback_amount)) => {
-                account.chargeback(chargeback_amount);
-                Ok(())
+                account.chargeback(*transaction_id, chargeback_amount)
             }
 
-            (&original, referenced) => Err(InvalidTransactionType(original, referenced)),
-        }
-    }
-
-    fn get_referenced_transaction<'a>(
-        &'a self,
-        original_transaction: &'a Transaction,
-    ) -> Result<&Transaction, TransactionFailure> {
-        let Transaction {
-            transaction_type,
-            transaction_id,
-            ..
-        } = &original_transaction;
-
-        if let Dispute = transaction_type {
-            self.transactions
-                .get(transaction_id)
-                .map(|tx| match &tx.transaction_type {
-                    Deposit(_) => {
-                        if self.disputed.contains(transaction_id) {
-                            Ok(tx)
-                        } else {
-                            Err(AlreadyDisputedTransaction)
-                        }
-                    }
-                    &invalid => Err(InvalidTransactionType(Dispute, invalid)),
-                })
-                .unwrap_or(Err(NonExistentTransaction))
-        } else if let Chargeback | Resolve = transaction_type {
-            self.transactions
-                .get(transaction_id)
-                .map(|tx| {
-                    if self.disputed.contains(transaction_id) {
-                        Ok(tx)
-                    } else {
-                        Err(UndisputedTransaction)
-                    }
-                })
-                .unwrap_or(Err(NonExistentTransaction))
-        } else {
-            Ok(original_transaction)
+            (&original, referenced) => Err(InvalidTransactionReference(original, referenced)),
         }
     }
 }

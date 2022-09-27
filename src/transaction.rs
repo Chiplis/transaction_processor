@@ -37,8 +37,9 @@ pub(crate) enum TransactionFailure {
     NonExistentTransaction,
     NonExistentAccount,
     UndisputedTransaction,
-    AlreadyDisputedTransaction,
-    InvalidTransactionType(TransactionType, TransactionType),
+    RedisputedTransaction,
+    FinalizedDispute,
+    InvalidTransactionReference(TransactionType, TransactionType),
 }
 
 pub(crate) type TransactionResult = Result<(), TransactionFailure>;
