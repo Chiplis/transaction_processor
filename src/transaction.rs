@@ -44,6 +44,7 @@ pub(crate) enum TransactionType {
     Chargeback,
 }
 
+#[derive(Debug)]
 pub(crate) enum TransactionFailure {
     InsufficientFunds,
     NonExistentTransaction,

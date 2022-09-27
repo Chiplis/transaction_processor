@@ -29,10 +29,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut ledger = Ledger::new();
     let accounts: &mut HashMap<AccountId, Account> = &mut HashMap::new();
-
+    let mut rows: usize = 2; // Start counting from the 2nd line since we skip the headers
     for row in csv.deserialize::<Transaction>() {
-        let transaction = row.unwrap();
-        let _ = ledger.process_transaction(accounts, transaction);
+        match row {
+            Err(error) => eprintln!("Skipping row due to parsing error: {}", error),
+            Ok(transaction) => match ledger.process_transaction(accounts, transaction) {
+                Err(error) => eprintln!("Row #{} not processed: {:?}", rows, error),
+                _ => (),
+            }
+        }
+        rows += 1;
     }
 
     println!("client,available,held,total,locked");
