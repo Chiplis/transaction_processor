@@ -1,9 +1,10 @@
+use std::error::Error;
 use crate::account::AccountId;
 use crate::transaction::TransactionType::{Chargeback, Deposit, Dispute, Resolve, Withdrawal};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::fmt::Formatter;
+use std::fmt::{Display, Formatter};
 use RowParsingError::{NegativeAmount, UndefinedAmount, UnknownTransactionType};
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
@@ -35,7 +36,7 @@ pub(crate) struct Transaction {
     pub transaction_id: TransactionId,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub(crate) enum TransactionType {
     Deposit(Decimal),
     Withdrawal(Decimal),
@@ -44,17 +45,40 @@ pub(crate) enum TransactionType {
     Chargeback,
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub(crate) enum TransactionFailure {
-    InsufficientFunds,
-    NonExistentTransaction,
-    NonExistentAccount,
-    UndisputedTransaction,
-    RedisputedTransaction,
-    FinalizedDispute,
+    InsufficientFunds(AccountId, TransactionId, Decimal),
+    NonExistentTransaction(TransactionId),
+    NonExistentAccount(AccountId),
+    UndisputedTransaction(TransactionId),
+    RedisputedTransaction(TransactionId),
+    FinalizedDispute(TransactionId),
     // An invalid transaction reference happens if you attempt to dispute/resolve/chargeback a non-deposit transaction
     InvalidTransactionReference(TransactionType, TransactionType),
 }
+
+impl Display for TransactionFailure {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            TransactionFailure::InsufficientFunds(account_id, tx_id, amount) =>
+                write!(f, "Transaction #{} for account #{} can't withdraw ${} due to insufficient funds", tx_id, account_id, amount),
+            TransactionFailure::NonExistentTransaction(tx_id) =>
+                write!(f, "Transaction #{} not found", tx_id),
+            TransactionFailure::NonExistentAccount(account_id) =>
+                write!(f, "Account #{} not found", account_id),
+            TransactionFailure::UndisputedTransaction(tx_id) =>
+                write!(f, "No previously disputed transaction #{} found", tx_id),
+            TransactionFailure::RedisputedTransaction(tx_id) =>
+                write!(f, "Transaction #{} has already been disputed", tx_id),
+            TransactionFailure::FinalizedDispute(tx_id) =>
+                write!(f, "Transaction #{} dispute has already ended", tx_id),
+            TransactionFailure::InvalidTransactionReference(a, b) =>
+                write!(f, "{:?} transaction cannot reference {:?}", a, b),
+        }
+    }
+}
+
+impl Error for TransactionFailure {}
 
 // The result of a transaction is either an empty type, meaning the transaction completed successfully,
 // or a particular transaction failure enum

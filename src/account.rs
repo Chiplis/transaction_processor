@@ -39,9 +39,9 @@ impl Account {
     }
 
     // A withdrawal can fail if the user tries to withdraw more funds than they have available
-    pub fn withdraw(&mut self, withdraw: Decimal) -> TransactionResult {
+    pub fn withdraw(&mut self, account_id: AccountId, tx_id: TransactionId, withdraw: Decimal) -> TransactionResult {
         if self.available() < withdraw {
-            return Err(InsufficientFunds);
+            return Err(InsufficientFunds(account_id, tx_id, withdraw));
         }
         Ok(self.available -= withdraw)
     }
@@ -49,7 +49,7 @@ impl Account {
     // Disputes can only be triggered once
     pub fn dispute(&mut self, tx_id: TransactionId, disputed: Decimal) -> TransactionResult {
         if self.past_disputes.contains(&tx_id) {
-            return Err(RedisputedTransaction);
+            return Err(RedisputedTransaction(tx_id));
         }
         self.available -= disputed;
         self.held += disputed;
@@ -60,9 +60,9 @@ impl Account {
     // Resolutions can only be triggered on non-finalized transactions, and require a previous dispute to exist
     pub fn resolve(&mut self, tx_id: TransactionId, resolved: Decimal) -> TransactionResult {
         if self.finalized_disputes.contains(&tx_id) {
-            return Err(FinalizedDispute);
+            return Err(FinalizedDispute(tx_id));
         } else if !self.past_disputes.contains(&tx_id) {
-            return Err(UndisputedTransaction);
+            return Err(UndisputedTransaction(tx_id));
         }
         self.available += resolved;
         self.held -= resolved;
@@ -73,9 +73,9 @@ impl Account {
     // Chargebacks can only be triggered on non-finalized transactions, and require a previous dispute to exist
     pub fn chargeback(&mut self, tx_id: TransactionId, chargeback: Decimal) -> TransactionResult {
         if self.finalized_disputes.contains(&tx_id) {
-            return Err(FinalizedDispute);
+            return Err(FinalizedDispute(tx_id));
         } else if !self.past_disputes.contains(&tx_id) {
-            return Err(UndisputedTransaction);
+            return Err(UndisputedTransaction(tx_id));
         }
         self.held -= chargeback;
         self.locked = true;

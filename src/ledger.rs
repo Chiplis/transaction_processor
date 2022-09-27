@@ -10,7 +10,7 @@ use TransactionType::{Chargeback, Dispute, Resolve};
 
 #[derive(Default)]
 pub(crate) struct Ledger {
-    transaction_types: HashMap<TransactionId, TransactionType>,
+    regular_transactions: HashMap<TransactionId, TransactionType>,
 }
 
 impl Ledger {
@@ -38,7 +38,7 @@ impl Ledger {
             Deposit(_) => accounts.entry(*account_id).or_insert(Account::new()),
             // Get the existing account or fail immediately
             Withdrawal(_) | Dispute | Resolve | Chargeback => {
-                accounts.get_mut(account_id).ok_or(NonExistentAccount)?
+                accounts.get_mut(account_id).ok_or(NonExistentAccount(*account_id))?
             }
         };
 
@@ -48,19 +48,19 @@ impl Ledger {
         // before we insert the processed transaction.
         if let Deposit(deposit) = transaction_type {
             account.deposit(*deposit)?;
-            self.transaction_types
+            self.regular_transactions
                 .insert(*transaction_id, *transaction_type);
             return Ok(());
         } else if let Withdrawal(withdrawal) = transaction_type {
-            account.withdraw(*withdrawal)?;
-            self.transaction_types
+            account.withdraw(*account_id, *transaction_id, *withdrawal)?;
+            self.regular_transactions
                 .insert(*transaction_id, *transaction_type);
             return Ok(());
         }
 
         // By this point we know the transaction type we're processing is either a dispute, resolve or chargeback
         let referenced_deposit = self
-            .transaction_types
+            .regular_transactions
             .get(transaction_id) // Get the transaction type referenced by the dispute/resolve/chargeback
             .map(|referenced_type| {
                 if let Deposit(_) = referenced_type {
@@ -73,7 +73,7 @@ impl Ledger {
                     ))
                 }
             })
-            .unwrap_or(Err(NonExistentTransaction))?;
+            .unwrap_or(Err(NonExistentTransaction(*transaction_id)))?;
 
         self.handle_referential_transaction(
             transaction_type,
@@ -82,8 +82,6 @@ impl Ledger {
             account,
         )?;
 
-        self.transaction_types
-            .insert(*transaction_id, *transaction_type);
         Ok(())
     }
 
