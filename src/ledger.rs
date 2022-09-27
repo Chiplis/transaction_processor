@@ -64,12 +64,12 @@ impl Ledger {
             .get(transaction_id) // Get the transaction type referenced by the dispute/resolve/chargeback
             .map(|referenced_type| {
                 if let Deposit(_) = referenced_type {
-                    // The referenced transaction type can only be a deposit
+                    // The only valid referenced transaction type is a deposit
                     Ok(referenced_type)
                 } else {
                     Err(InvalidTransactionReference(
-                        *transaction_type, // Dispute/Resolve/Chargeback
-                        *referenced_type,  // A non-deposit transaction type
+                        *transaction_type,
+                        *referenced_type,
                     ))
                 }
             })
@@ -107,8 +107,6 @@ impl Ledger {
                 account.chargeback(*transaction_id, chargeback_amount)
             }
 
-            // Any invalid combination of referential/reference transactions
-            // should've been dealt with before the method call
             _ => unreachable!("Any invalid combination of referential/reference transactions should've been dealt with before calling this method"),
         }
     }

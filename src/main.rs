@@ -74,20 +74,121 @@ mod tests {
     use csv::{ReaderBuilder, Trim};
     use rust_decimal::Decimal;
     use std::collections::HashMap;
-    use std::error::Error;
     use std::path::Path;
 
     #[test]
-    fn process_csv_parses_string_correctly() -> Result<(), Box<dyn Error>> {
+    fn processes_regular_transactions_correctly() {
+        let csv = "type,client,tx,amount
+                        deposit, 1, 1, 1
+                        deposit, 1, 2, 1
+                        withdrawal, 1, 3, 0.5";
+        let csv = ReaderBuilder::new()
+            .has_headers(true)
+            .trim(Trim::All)
+            .flexible(true)
+            .from_reader(csv.as_bytes());
+
+        let accounts = &mut HashMap::new();
+        let (accounts, errors) = process_csv(csv, accounts);
+        let first_account = accounts.get(&AccountId(1)).unwrap();
+        assert_eq!(first_account.available(), Decimal::from_str_exact("1.5").unwrap());
+        assert_eq!(errors.len(), 0);
+    }
+
+    #[test]
+    fn processes_dispute_correctly() {
+        let csv = "type,client,tx,amount
+                        deposit,1,1,1.0001
+                        dispute, 1, 1";
+        let csv = ReaderBuilder::new()
+            .has_headers(true)
+            .trim(Trim::All)
+            .flexible(true)
+            .from_reader(csv.as_bytes());
+
+        let accounts = &mut HashMap::new();
+        let (accounts, errors) = process_csv(csv, accounts);
+        let first_account = accounts.get(&AccountId(1)).unwrap();
+        assert_eq!(first_account.available(), Decimal::from_str_exact("0").unwrap());
+        assert_eq!(first_account.held(), Decimal::from_str_exact("1.0001").unwrap());
+        assert_eq!(first_account.held(), first_account.total());
+        assert_eq!(errors.len(), 0);
+    }
+
+    #[test]
+    fn processes_resolve_correctly() {
+        let csv = "type,client,tx,amount
+                        deposit,1,1,1.0001
+                        dispute, 1, 1,
+                        resolve, 1, 1";
+        let csv = ReaderBuilder::new()
+            .has_headers(true)
+            .trim(Trim::All)
+            .flexible(true)
+            .from_reader(csv.as_bytes());
+
+        let accounts = &mut HashMap::new();
+        let (accounts, errors) = process_csv(csv, accounts);
+        let first_account = accounts.get(&AccountId(1)).unwrap();
+        assert_eq!(first_account.available(), Decimal::from_str_exact("1.0001").unwrap());
+        assert_eq!(first_account.held(), Decimal::from_str_exact("0").unwrap());
+        assert_eq!(first_account.available(), first_account.total());
+        assert_eq!(errors.len(), 0);
+    }
+
+    #[test]
+    fn processes_chargeback_correctly() {
+        let csv = "type,client,tx,amount
+                        deposit,1,1,1.0001
+                        dispute, 1, 1,
+                        chargeback, 1, 1";
+        let csv = ReaderBuilder::new()
+            .has_headers(true)
+            .trim(Trim::All)
+            .flexible(true)
+            .from_reader(csv.as_bytes());
+
+        let accounts = &mut HashMap::new();
+        let (accounts, errors) = process_csv(csv, accounts);
+        let first_account = accounts.get(&AccountId(1)).unwrap();
+        assert_eq!(first_account.available(), Decimal::from_str_exact("0").unwrap());
+        assert_eq!(first_account.held(), Decimal::from_str_exact("0").unwrap());
+        assert_eq!(first_account.locked(), true);
+        assert_eq!(errors.len(), 0);
+    }
+
+    #[test]
+    fn process_csv_parses_file_correctly() {
+        let csv = ReaderBuilder::new()
+            .has_headers(true)
+            .trim(Trim::All)
+            .flexible(true)
+            .from_path(Path::new("tests/basic.csv")).unwrap();
+        let accounts = &mut HashMap::new();
+        let (accounts, errors) = process_csv(csv, accounts);
+        let (first_account, second_account) = (
+            accounts.get(&AccountId(1)).unwrap(),
+            accounts.get(&AccountId(2)).unwrap(),
+        );
+        assert_eq!(first_account.total(), Decimal::from_str_exact("1.5001").unwrap());
+        assert_eq!(second_account.total(), Decimal::from_str_exact("2.1").unwrap());
+        assert_eq!(errors.len(), 2);
+        assert_eq!(
+            errors[0].to_string(),
+            "Transaction #5 for account #2 can't withdraw $3 due to insufficient funds"
+        );
+        assert_eq!(errors[1].to_string(), "Transaction #5 not found");
+    }
+
+    #[test]
+    fn parses_csv_with_logic_errors_correctly() {
         let csv = "type,client,tx,amount
                         deposit,1,1,1.0001
                         deposit, 2, 2, 2.1000
                         deposit, 1, 3, 2.0
                         withdrawal, 1, 4, 1.5
                         withdrawal, 2, 5, 3.0,
-                        dispute, 2, 5,
-                        dispute, 1, 1,
-                        chargeback, 1, 1";
+                        dispute, 2, 5";
         let csv = ReaderBuilder::new()
             .has_headers(true)
             .trim(Trim::All)
@@ -100,38 +201,55 @@ mod tests {
             accounts.get(&AccountId(1)).unwrap(),
             accounts.get(&AccountId(2)).unwrap(),
         );
-        assert_eq!(first_account.total(), Decimal::from_str_exact("0.5")?);
-        assert_eq!(second_account.total(), Decimal::from_str_exact("2.1")?);
+        assert_eq!(first_account.available(), Decimal::from_str_exact("1.5001").unwrap());
+        assert_eq!(second_account.available(), Decimal::from_str_exact("2.1").unwrap());
         assert_eq!(errors.len(), 2);
         assert_eq!(
             errors[0].to_string(),
             "Transaction #5 for account #2 can't withdraw $3 due to insufficient funds"
         );
         assert_eq!(errors[1].to_string(), "Transaction #5 not found");
-        Ok(())
     }
 
     #[test]
-    fn process_csv_parses_file_correctly() -> Result<(), Box<dyn Error>> {
+    fn parses_csv_with_parsing_errors_correctly() {
+        let csv = "type,client,tx,amount
+                        invalid,0
+                        unknown,1,1
+                        deposit,1,1,-1.001
+                        deposit,1,1,
+                        deposit,1,1,1.0001
+                        deposit, 2, 2, 3.3";
         let csv = ReaderBuilder::new()
             .has_headers(true)
             .trim(Trim::All)
             .flexible(true)
-            .from_path(Path::new("tests/basic.csv"))?;
+            .from_reader(csv.as_bytes());
+
         let accounts = &mut HashMap::new();
         let (accounts, errors) = process_csv(csv, accounts);
         let (first_account, second_account) = (
             accounts.get(&AccountId(1)).unwrap(),
             accounts.get(&AccountId(2)).unwrap(),
         );
-        assert_eq!(first_account.total(), Decimal::from_str_exact("1.5001")?);
-        assert_eq!(second_account.total(), Decimal::from_str_exact("2.1")?);
-        assert_eq!(errors.len(), 2);
+        assert_eq!(first_account.total(), Decimal::from_str_exact("1.0001").unwrap());
+        assert_eq!(second_account.total(), Decimal::from_str_exact("3.3").unwrap());
+        assert_eq!(errors.len(), 4);
         assert_eq!(
             errors[0].to_string(),
-            "Transaction #5 for account #2 can't withdraw $3 due to insufficient funds"
+            "CSV deserialize error: record 1 (line: 2, byte: 22): expected field, but got end of row"
         );
-        assert_eq!(errors[1].to_string(), "Transaction #5 not found");
-        Ok(())
+        assert_eq!(
+            errors[1].to_string(),
+            "CSV deserialize error: record 2 (line: 3, byte: 56): unknown is an unknown type"
+        );
+        assert_eq!(
+            errors[2].to_string(),
+            "CSV deserialize error: record 3 (line: 4, byte: 92): Transaction requires a positive amount"
+        );
+        assert_eq!(
+            errors[3].to_string(),
+            "CSV deserialize error: record 4 (line: 5, byte: 135): Transaction requires a defined amount"
+        );
     }
 }
