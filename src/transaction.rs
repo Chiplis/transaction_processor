@@ -51,13 +51,12 @@ pub(crate) enum TransactionFailure {
     UndisputedTransaction,
     RedisputedTransaction,
     FinalizedDispute,
-    // An invalid transaction reference happens when you attempt to dispute/resolve/chargeback
-    // a transaction which is NOT a deposit
+    // An invalid transaction reference happens if you attempt to dispute/resolve/chargeback a non-deposit transaction
     InvalidTransactionReference(TransactionType, TransactionType),
 }
 
 // The result of a transaction is either an empty type, meaning the transaction completed successfully,
-// or a particular transaction failure reason
+// or a particular transaction failure enum
 pub(crate) type TransactionResult = Result<(), TransactionFailure>;
 
 enum RowParsingError {
@@ -89,8 +88,14 @@ impl TryFrom<TransactionRow> for Transaction {
         } = row;
 
         let amount = match amount {
-            Some(value) => if value.is_sign_negative() { Err(NegativeAmount) } else { Ok(value) },
-            None => Err(UndefinedAmount)
+            Some(value) => {
+                if value.is_sign_negative() {
+                    Err(NegativeAmount)
+                } else {
+                    Ok(value)
+                }
+            }
+            None => Err(UndefinedAmount),
         };
 
         let transaction_type = match transaction_type.as_str() {

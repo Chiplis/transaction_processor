@@ -38,6 +38,7 @@ impl Account {
         Ok(())
     }
 
+    // A withdrawal can fail if the user tries to withdraw more funds than they have available
     pub fn withdraw(&mut self, withdraw: Decimal) -> TransactionResult {
         if self.available() < withdraw {
             return Err(InsufficientFunds);
@@ -45,6 +46,7 @@ impl Account {
         Ok(self.available -= withdraw)
     }
 
+    // Disputes can only be triggered once
     pub fn dispute(&mut self, tx_id: TransactionId, disputed: Decimal) -> TransactionResult {
         if self.past_disputes.contains(&tx_id) {
             return Err(RedisputedTransaction);
@@ -55,6 +57,7 @@ impl Account {
         Ok(())
     }
 
+    // Resolutions can only be triggered on non-finalized transactions, and require a previous dispute to exist
     pub fn resolve(&mut self, tx_id: TransactionId, resolved: Decimal) -> TransactionResult {
         if self.finalized_disputes.contains(&tx_id) {
             return Err(FinalizedDispute);
@@ -67,6 +70,7 @@ impl Account {
         Ok(())
     }
 
+    // Chargebacks can only be triggered on non-finalized transactions, and require a previous dispute to exist
     pub fn chargeback(&mut self, tx_id: TransactionId, chargeback: Decimal) -> TransactionResult {
         if self.finalized_disputes.contains(&tx_id) {
             return Err(FinalizedDispute);
@@ -78,6 +82,8 @@ impl Account {
         self.finalized_disputes.insert(tx_id);
         Ok(())
     }
+
+    // Getters to deal with the required decimal precision when generating the output file
 
     pub fn total(&self) -> Decimal {
         (self.available + self.held).round_dp(4).normalize()

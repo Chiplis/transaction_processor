@@ -94,6 +94,8 @@ impl Ledger {
         transaction_id: &TransactionId,
         account: &mut Account,
     ) -> TransactionResult {
+        // The referenced transaction should always be a deposit,
+        // while the way the account state is modified depends on the referential transaction
         match (referential_transaction_type, referenced_deposit) {
             (Dispute, Deposit(disputed_amount)) => {
                 account.dispute(*transaction_id, disputed_amount)
@@ -107,7 +109,9 @@ impl Ledger {
                 account.chargeback(*transaction_id, chargeback_amount)
             }
 
-            (&original, referenced) => Err(InvalidTransactionReference(original, referenced)),
+            // Any invalid combination of referential/reference transactions
+            // should've been dealt with before the method call
+            _ => unreachable!("Any invalid combination of referential/reference transactions should've been dealt with before calling this method"),
         }
     }
 }
