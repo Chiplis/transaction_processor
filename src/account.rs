@@ -22,7 +22,7 @@ pub(crate) struct Account {
     held: Decimal,
     past_disputes: HashSet<TransactionId>,
     finalized_disputes: HashSet<TransactionId>,
-    pub(crate) locked: bool,
+    locked: bool,
 }
 
 impl Account {
@@ -87,5 +87,9 @@ impl Account {
 
     pub fn available(&self) -> Decimal {
         self.available.round_dp(4).normalize()
+    }
+
+    pub fn locked(&self) -> bool {
+        self.locked
     }
 }

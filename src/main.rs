@@ -39,7 +39,7 @@ dispute, 2, 5";
             account.available(),
             account.held(),
             account.total(),
-            account.locked
+            account.locked()
         );
     });
 }
