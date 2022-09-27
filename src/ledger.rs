@@ -10,7 +10,7 @@ use crate::account::AccountId;
 
 #[derive(Default)]
 pub(crate) struct Ledger {
-    transactions: HashMap<TransactionId, Transaction>,
+    transactions: HashMap<TransactionId, Transaction>
 }
 
 impl Ledger {
@@ -31,6 +31,13 @@ impl Ledger {
             transaction_id,
         } = &transaction;
 
+        let account = match transaction_type {
+            Deposit(_) => accounts.entry(*account_id).or_insert(Account::new()),
+            Withdrawal(_) | Dispute | Resolve | Chargeback => {
+                accounts.get_mut(account_id).ok_or(NonExistentAccount)?
+            }
+        };
+
         let referenced_tx = if let Chargeback | Resolve | Dispute = transaction_type {
             self.transactions
                 .get(transaction_id)
@@ -42,13 +49,6 @@ impl Ledger {
         } else {
             Ok(&transaction)
         }?;
-
-        let account = match transaction_type {
-            Deposit(_) => accounts.entry(*account_id).or_insert(Account::new()),
-            Withdrawal(_) | Dispute | Resolve | Chargeback => {
-                accounts.get_mut(account_id).ok_or(NonExistentAccount)?
-            }
-        };
 
         self.apply_transaction_to_account(
             transaction_type,
