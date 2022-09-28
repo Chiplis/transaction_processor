@@ -5,12 +5,12 @@ mod transaction;
 use crate::account::{Account, AccountId};
 use crate::ledger::Ledger;
 use crate::transaction::Transaction;
+use anyhow::{bail, Error};
 use csv::{Reader, ReaderBuilder, Trim};
 use std::collections::HashMap;
 use std::env;
 use std::io::Read;
 use std::path::Path;
-use anyhow::{bail, Error};
 
 fn main() -> Result<(), Error> {
     let args = &env::args().collect::<Vec<String>>();
