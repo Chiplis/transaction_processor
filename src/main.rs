@@ -26,7 +26,7 @@ fn main() -> Result<(), Error> {
         .flexible(true) // Allows parsing of differently sized rows
         .from_path(Path::new(path))?;
 
-    let (accounts, errors) = process_csv(csv, HashMap::new());
+    let (accounts, errors) = process_csv(csv);
 
     println!("client,available,held,total,locked");
     accounts.iter().for_each(|(account_id, account)| {
@@ -46,13 +46,10 @@ fn main() -> Result<(), Error> {
 
 // Traverses the specified CSV reader rows and returns the accounts HashMap modified according to all valid transactions
 // Also returns an array containing all the errors (parsing and logical) found during the traversal
-fn process_csv(
-    mut csv: Reader<impl Read>,
-    mut accounts: HashMap<AccountId, Account>,
-) -> (HashMap<AccountId, Account>, Vec<Error>) {
+fn process_csv(mut csv: Reader<impl Read>) -> (HashMap<AccountId, Account>, Vec<Error>) {
     let mut ledger = Ledger::new();
     let mut errors: Vec<Error> = vec![];
-
+    let mut accounts = HashMap::new();
     let mut process_row = |row| Ok(ledger.process_transaction(&mut accounts, row?)?);
 
     for row in csv.deserialize::<Transaction>() {
@@ -65,7 +62,7 @@ fn process_csv(
 
 #[cfg(test)]
 mod tests {
-    use crate::{process_csv, AccountId};
+    use crate::{process_csv, Account, AccountId};
     use csv::{ReaderBuilder, Trim};
     use rust_decimal::Decimal;
     use std::collections::HashMap;
@@ -83,7 +80,7 @@ mod tests {
             .flexible(true)
             .from_reader(csv.as_bytes());
 
-        let (accounts, errors) = process_csv(csv, HashMap::new());
+        let (accounts, errors) = process_csv(csv);
         let first_account = accounts.get(&AccountId(1)).unwrap();
         assert_eq!(
             first_account.available(),
@@ -103,7 +100,7 @@ mod tests {
             .flexible(true)
             .from_reader(csv.as_bytes());
 
-        let (accounts, errors) = process_csv(csv, HashMap::new());
+        let (accounts, errors) = process_csv(csv);
         let first_account = accounts.get(&AccountId(1)).unwrap();
         assert_eq!(
             first_account.available(),
@@ -129,7 +126,7 @@ mod tests {
             .flexible(true)
             .from_reader(csv.as_bytes());
 
-        let (accounts, errors) = process_csv(csv, HashMap::new());
+        let (accounts, errors) = process_csv(csv);
         let first_account = accounts.get(&AccountId(1)).unwrap();
         assert_eq!(
             first_account.available(),
@@ -152,7 +149,7 @@ mod tests {
             .flexible(true)
             .from_reader(csv.as_bytes());
 
-        let (accounts, errors) = process_csv(csv, HashMap::new());
+        let (accounts, errors) = process_csv(csv);
         let first_account = accounts.get(&AccountId(1)).unwrap();
         assert_eq!(
             first_account.available(),
@@ -171,7 +168,7 @@ mod tests {
             .flexible(true)
             .from_path(Path::new("tests/basic.csv"))
             .unwrap();
-        let (accounts, errors) = process_csv(csv, HashMap::new());
+        let (accounts, errors) = process_csv(csv);
         let (first_account, second_account) = (
             accounts.get(&AccountId(1)).unwrap(),
             accounts.get(&AccountId(2)).unwrap(),
@@ -207,7 +204,7 @@ mod tests {
             .flexible(true)
             .from_reader(csv.as_bytes());
 
-        let (accounts, errors) = process_csv(csv, HashMap::new());
+        let (accounts, errors) = process_csv(csv);
         let (first_account, second_account) = (
             accounts.get(&AccountId(1)).unwrap(),
             accounts.get(&AccountId(2)).unwrap(),
@@ -243,7 +240,7 @@ mod tests {
             .flexible(true)
             .from_reader(csv.as_bytes());
 
-        let (accounts, errors) = process_csv(csv, HashMap::new());
+        let (accounts, errors) = process_csv(csv);
         let (first_account, second_account) = (
             accounts.get(&AccountId(1)).unwrap(),
             accounts.get(&AccountId(2)).unwrap(),
