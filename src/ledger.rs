@@ -54,8 +54,6 @@ impl Ledger {
                 }
             });
 
-        // If we're dealing with a deposit or a withdrawal, we don't need to reference a
-        // previous transaction, so we can return early from the method call.
         // Any errors that happen during the deposit/withdrawal halt the method execution
         // before we insert the processed transaction.
         match transaction_type {
