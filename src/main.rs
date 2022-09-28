@@ -8,18 +8,14 @@ use crate::transaction::Transaction;
 use csv::{Reader, ReaderBuilder, Trim};
 use std::collections::HashMap;
 use std::env;
-use std::error::Error;
 use std::io::Read;
 use std::path::Path;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), anyhow::Error> {
     let args = &env::args().collect::<Vec<String>>();
 
     if args.len() != 2 {
-        Err(format!(
-            "Expected 1 argument for CSV input, got {}",
-            args.len() - 1
-        ))?
+        anyhow::bail!("Expected 1 argument for CSV input, got {}", args.len() - 1);
     }
 
     let path = &args[1];
@@ -29,8 +25,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .flexible(true) // Allows parsing of differently sized rows
         .from_path(Path::new(path))?;
 
-    let mut accounts = HashMap::new();
-    let (accounts, errors) = process_csv(csv, &mut accounts);
+    let (accounts, errors) = process_csv(csv, HashMap::new());
 
     println!("client,available,held,total,locked");
     accounts.iter().for_each(|(account_id, account)| {
@@ -52,17 +47,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 // Also returns an array containing all the errors (parsing and logical) found during the traversal
 fn process_csv(
     mut csv: Reader<impl Read>,
-    accounts: &mut HashMap<AccountId, Account>,
-) -> (&HashMap<AccountId, Account>, Vec<Box<dyn Error>>) {
+    mut accounts: HashMap<AccountId, Account>,
+) -> (HashMap<AccountId, Account>, Vec<anyhow::Error>) {
     let mut ledger = Ledger::new();
-    let mut errors: Vec<Box<dyn Error>> = vec![];
+    let mut errors: Vec<anyhow::Error> = vec![];
+
+    let mut process_row = |row| Ok(ledger.process_transaction(&mut accounts, row?)?);
+
     for row in csv.deserialize::<Transaction>() {
-        match row {
-            Err(error) => errors.push(Box::new(error)),
-            Ok(transaction) => match ledger.process_transaction(accounts, transaction) {
-                Ok(()) => (),
-                Err(error) => errors.push(Box::new(error)),
-            },
+        if let Err(e) = process_row(row) {
+            errors.push(e);
         }
     }
     (accounts, errors)
@@ -88,10 +82,12 @@ mod tests {
             .flexible(true)
             .from_reader(csv.as_bytes());
 
-        let accounts = &mut HashMap::new();
-        let (accounts, errors) = process_csv(csv, accounts);
+        let (accounts, errors) = process_csv(csv, HashMap::new());
         let first_account = accounts.get(&AccountId(1)).unwrap();
-        assert_eq!(first_account.available(), Decimal::from_str_exact("1.5").unwrap());
+        assert_eq!(
+            first_account.available(),
+            Decimal::from_str_exact("1.5").unwrap()
+        );
         assert_eq!(errors.len(), 0);
     }
 
@@ -106,11 +102,16 @@ mod tests {
             .flexible(true)
             .from_reader(csv.as_bytes());
 
-        let accounts = &mut HashMap::new();
-        let (accounts, errors) = process_csv(csv, accounts);
+        let (accounts, errors) = process_csv(csv, HashMap::new());
         let first_account = accounts.get(&AccountId(1)).unwrap();
-        assert_eq!(first_account.available(), Decimal::from_str_exact("0").unwrap());
-        assert_eq!(first_account.held(), Decimal::from_str_exact("1.0001").unwrap());
+        assert_eq!(
+            first_account.available(),
+            Decimal::from_str_exact("0").unwrap()
+        );
+        assert_eq!(
+            first_account.held(),
+            Decimal::from_str_exact("1.0001").unwrap()
+        );
         assert_eq!(first_account.held(), first_account.total());
         assert_eq!(errors.len(), 0);
     }
@@ -127,10 +128,12 @@ mod tests {
             .flexible(true)
             .from_reader(csv.as_bytes());
 
-        let accounts = &mut HashMap::new();
-        let (accounts, errors) = process_csv(csv, accounts);
+        let (accounts, errors) = process_csv(csv, HashMap::new());
         let first_account = accounts.get(&AccountId(1)).unwrap();
-        assert_eq!(first_account.available(), Decimal::from_str_exact("1.0001").unwrap());
+        assert_eq!(
+            first_account.available(),
+            Decimal::from_str_exact("1.0001").unwrap()
+        );
         assert_eq!(first_account.held(), Decimal::from_str_exact("0").unwrap());
         assert_eq!(first_account.available(), first_account.total());
         assert_eq!(errors.len(), 0);
@@ -148,10 +151,12 @@ mod tests {
             .flexible(true)
             .from_reader(csv.as_bytes());
 
-        let accounts = &mut HashMap::new();
-        let (accounts, errors) = process_csv(csv, accounts);
+        let (accounts, errors) = process_csv(csv, HashMap::new());
         let first_account = accounts.get(&AccountId(1)).unwrap();
-        assert_eq!(first_account.available(), Decimal::from_str_exact("0").unwrap());
+        assert_eq!(
+            first_account.available(),
+            Decimal::from_str_exact("0").unwrap()
+        );
         assert_eq!(first_account.held(), Decimal::from_str_exact("0").unwrap());
         assert_eq!(first_account.locked(), true);
         assert_eq!(errors.len(), 0);
@@ -163,15 +168,21 @@ mod tests {
             .has_headers(true)
             .trim(Trim::All)
             .flexible(true)
-            .from_path(Path::new("tests/basic.csv")).unwrap();
-        let accounts = &mut HashMap::new();
-        let (accounts, errors) = process_csv(csv, accounts);
+            .from_path(Path::new("tests/basic.csv"))
+            .unwrap();
+        let (accounts, errors) = process_csv(csv, HashMap::new());
         let (first_account, second_account) = (
             accounts.get(&AccountId(1)).unwrap(),
             accounts.get(&AccountId(2)).unwrap(),
         );
-        assert_eq!(first_account.total(), Decimal::from_str_exact("1.5001").unwrap());
-        assert_eq!(second_account.total(), Decimal::from_str_exact("2.1").unwrap());
+        assert_eq!(
+            first_account.total(),
+            Decimal::from_str_exact("1.5001").unwrap()
+        );
+        assert_eq!(
+            second_account.total(),
+            Decimal::from_str_exact("2.1").unwrap()
+        );
         assert_eq!(errors.len(), 2);
         assert_eq!(
             errors[0].to_string(),
@@ -195,14 +206,19 @@ mod tests {
             .flexible(true)
             .from_reader(csv.as_bytes());
 
-        let accounts = &mut HashMap::new();
-        let (accounts, errors) = process_csv(csv, accounts);
+        let (accounts, errors) = process_csv(csv, HashMap::new());
         let (first_account, second_account) = (
             accounts.get(&AccountId(1)).unwrap(),
             accounts.get(&AccountId(2)).unwrap(),
         );
-        assert_eq!(first_account.available(), Decimal::from_str_exact("1.5001").unwrap());
-        assert_eq!(second_account.available(), Decimal::from_str_exact("2.1").unwrap());
+        assert_eq!(
+            first_account.available(),
+            Decimal::from_str_exact("1.5001").unwrap()
+        );
+        assert_eq!(
+            second_account.available(),
+            Decimal::from_str_exact("2.1").unwrap()
+        );
         assert_eq!(errors.len(), 2);
         assert_eq!(
             errors[0].to_string(),
@@ -226,14 +242,19 @@ mod tests {
             .flexible(true)
             .from_reader(csv.as_bytes());
 
-        let accounts = &mut HashMap::new();
-        let (accounts, errors) = process_csv(csv, accounts);
+        let (accounts, errors) = process_csv(csv, HashMap::new());
         let (first_account, second_account) = (
             accounts.get(&AccountId(1)).unwrap(),
             accounts.get(&AccountId(2)).unwrap(),
         );
-        assert_eq!(first_account.total(), Decimal::from_str_exact("1.0001").unwrap());
-        assert_eq!(second_account.total(), Decimal::from_str_exact("3.3").unwrap());
+        assert_eq!(
+            first_account.total(),
+            Decimal::from_str_exact("1.0001").unwrap()
+        );
+        assert_eq!(
+            second_account.total(),
+            Decimal::from_str_exact("3.3").unwrap()
+        );
         assert_eq!(errors.len(), 4);
         assert_eq!(
             errors[0].to_string(),

@@ -48,7 +48,8 @@ impl Account {
         if self.available() < withdraw {
             return Err(InsufficientFunds(account_id, tx_id, withdraw));
         }
-        Ok(self.available -= withdraw)
+        self.available -= withdraw;
+        Ok(())
     }
 
     // Disputes can only be triggered once
