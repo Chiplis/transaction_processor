@@ -10,12 +10,13 @@ use std::collections::HashMap;
 use std::env;
 use std::io::Read;
 use std::path::Path;
+use anyhow::{bail, Error};
 
-fn main() -> Result<(), anyhow::Error> {
+fn main() -> Result<(), Error> {
     let args = &env::args().collect::<Vec<String>>();
 
     if args.len() != 2 {
-        anyhow::bail!("Expected 1 argument for CSV input, got {}", args.len() - 1);
+        bail!("Expected 1 argument for CSV input, got {}", args.len() - 1);
     }
 
     let path = &args[1];
@@ -48,9 +49,9 @@ fn main() -> Result<(), anyhow::Error> {
 fn process_csv(
     mut csv: Reader<impl Read>,
     mut accounts: HashMap<AccountId, Account>,
-) -> (HashMap<AccountId, Account>, Vec<anyhow::Error>) {
+) -> (HashMap<AccountId, Account>, Vec<Error>) {
     let mut ledger = Ledger::new();
-    let mut errors: Vec<anyhow::Error> = vec![];
+    let mut errors: Vec<Error> = vec![];
 
     let mut process_row = |row| Ok(ledger.process_transaction(&mut accounts, row?)?);
 
