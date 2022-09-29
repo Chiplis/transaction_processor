@@ -65,7 +65,7 @@ mod tests {
     use crate::{process_csv, AccountId};
     use csv::{ReaderBuilder, Trim};
     use rust_decimal::Decimal;
-    
+
     use std::path::Path;
 
     #[test]
@@ -184,20 +184,26 @@ mod tests {
         assert_eq!(errors.len(), 2);
         assert_eq!(
             errors[0].to_string(),
-            "Transaction #5 for account #2 can't withdraw $3 due to insufficient funds"
+            "TransactionId(5) for AccountId(2) can't withdraw $3 due to insufficient funds"
         );
-        assert_eq!(errors[1].to_string(), "Transaction #5 not found");
+        assert_eq!(errors[1].to_string(), "TransactionId(5) not found");
     }
 
     #[test]
     fn parses_csv_with_logic_errors_correctly() {
         let csv = "type,client,tx,amount
                         deposit,1,1,1.0001
-                        deposit, 2, 2, 2.1000
-                        deposit, 1, 3, 2.0
-                        withdrawal, 1, 4, 1.5
-                        withdrawal, 2, 5, 3.0,
-                        dispute, 2, 5";
+                        deposit,2,2,2.1000
+                        deposit,1,3,2.0
+                        withdrawal,1,4,1.5
+                        withdrawal,2,5,3.0,
+                        withdrawal,2,6,1.1,
+                        dispute,2,5,
+                        dispute,2,6,
+                        dispute,1,1,
+                        resolve,1,1,
+                        chargeback,1,1,
+                        dispute,2,2";
         let csv = ReaderBuilder::new()
             .has_headers(true)
             .trim(Trim::All)
@@ -214,15 +220,29 @@ mod tests {
             Decimal::from_str_exact("1.5001").unwrap()
         );
         assert_eq!(
-            second_account.available(),
+            second_account.held(),
             Decimal::from_str_exact("2.1").unwrap()
         );
-        assert_eq!(errors.len(), 2);
+        assert_eq!(
+            second_account.available(),
+            // At this point the user should have a negative available balance because they withdrew
+            // some funds from the account and then reverted the original funding deposit
+            Decimal::from_str_exact("-1.1").unwrap()
+        );
+        assert_eq!(errors.len(), 4);
         assert_eq!(
             errors[0].to_string(),
-            "Transaction #5 for account #2 can't withdraw $3 due to insufficient funds"
+            "TransactionId(5) for AccountId(2) can't withdraw $3 due to insufficient funds"
         );
-        assert_eq!(errors[1].to_string(), "Transaction #5 not found");
+        assert_eq!(errors[1].to_string(), "TransactionId(5) not found");
+        assert_eq!(
+            errors[2].to_string(),
+            "Dispute cannot reference TransactionId(6) which is a Withdrawal(1.1)"
+        );
+        assert_eq!(
+            errors[3].to_string(),
+            "TransactionId(1) cannot transition from Resolved to ChargedBack"
+        );
     }
 
     #[test]
@@ -264,7 +284,7 @@ mod tests {
         );
         assert_eq!(
             errors[2].to_string(),
-            "CSV deserialize error: record 3 (line: 4, byte: 92): Transaction requires a positive amount"
+            "CSV deserialize error: record 3 (line: 4, byte: 92): Transaction requires a positive amount but was -1.001"
         );
         assert_eq!(
             errors[3].to_string(),

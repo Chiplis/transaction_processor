@@ -2,16 +2,11 @@ use crate::account::AccountId;
 use crate::transaction::TransactionType::{Chargeback, Deposit, Dispute, Resolve, Withdrawal};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Formatter};
+use DepositState::Deposited;
 use RowParsingError::{NegativeAmount, UndefinedAmount, UnknownTransactionType};
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub(crate) struct TransactionId(u32);
-impl fmt::Display for TransactionId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
 
 // This struct defines all the fields we can find in the parsed CSV
 #[derive(Debug, Serialize, Deserialize)]
@@ -36,30 +31,36 @@ pub(crate) struct Transaction {
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub(crate) enum TransactionType {
-    Deposit(Decimal),
+    Deposit(Decimal, DepositState),
     Withdrawal(Decimal),
     Dispute,
     Resolve,
     Chargeback,
 }
 
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub enum DepositState {
+    Deposited,
+    Disputed,
+    Resolved,
+    ChargedBack,
+}
+
 #[derive(thiserror::Error, Debug, Serialize, Deserialize)]
 pub(crate) enum TransactionFailure {
-    #[error("Transaction #{1} for account #{0} can't withdraw ${2} due to insufficient funds")]
+    #[error("{1:?} for {0:?} can't withdraw ${2} due to insufficient funds")]
     InsufficientFunds(AccountId, TransactionId, Decimal),
-    #[error("Transaction #{0} not found")]
+    #[error("{0:?} not found")]
     NonExistentTransaction(TransactionId),
-    #[error("Account #{0} not found")]
+    #[error("{0:?} not found")]
     NonExistentAccount(AccountId),
-    #[error("No previously disputed transaction #{0} found")]
+    #[error("No previously disputed {0:?} found")]
     UndisputedTransaction(TransactionId),
-    #[error("Transaction #{0} has already been disputed")]
-    RedisputedTransaction(TransactionId),
-    #[error("Transaction #{0} dispute has already ended")]
-    FinalizedDispute(TransactionId),
+    #[error("{0:?} cannot transition from {1:?} to {2:?}")]
+    InvalidDepositTransition(TransactionId, DepositState, DepositState),
     // An invalid transaction reference happens if you attempt to dispute/resolve/chargeback a non-deposit transaction
-    #[error("{0:?} transaction cannot reference {1:?}")]
-    InvalidTransactionReference(TransactionType, TransactionType),
+    #[error("{1:?} cannot reference {0:?} which is a {2:?}")]
+    InvalidTransactionReference(TransactionId, TransactionType, TransactionType),
 }
 
 // The result of a transaction is either an empty type, meaning the transaction completed successfully,
@@ -72,8 +73,8 @@ enum RowParsingError {
     UnknownTransactionType(String),
     #[error("Transaction requires a defined amount")]
     UndefinedAmount,
-    #[error("Transaction requires a positive amount")]
-    NegativeAmount,
+    #[error("Transaction requires a positive amount but was {0}")]
+    NegativeAmount(Decimal),
 }
 
 impl TryFrom<TransactionRow> for Transaction {
@@ -89,14 +90,14 @@ impl TryFrom<TransactionRow> for Transaction {
 
         let sane_amount = amount.ok_or(UndefinedAmount).and_then(|value| {
             if value.is_sign_negative() {
-                Err(NegativeAmount)
+                Err(NegativeAmount(value))
             } else {
                 Ok(value)
             }
         });
 
         let transaction_type = match transaction_type.as_str() {
-            "deposit" => Deposit(sane_amount?),
+            "deposit" => Deposit(sane_amount?, Deposited),
             "withdrawal" => Withdrawal(sane_amount?),
             "dispute" => Dispute,
             "resolve" => Resolve,

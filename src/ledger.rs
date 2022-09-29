@@ -1,16 +1,20 @@
 use crate::account::AccountId;
+use crate::transaction::DepositState::{ChargedBack, Resolved};
 use crate::transaction::TransactionFailure::{
-    InvalidTransactionReference, NonExistentAccount, NonExistentTransaction,
+    InsufficientFunds, InvalidDepositTransition, InvalidTransactionReference, NonExistentAccount,
+    NonExistentTransaction,
 };
 use crate::transaction::TransactionType::{Deposit, Withdrawal};
-use crate::transaction::{TransactionId, TransactionResult, TransactionType};
+use crate::transaction::{DepositState, TransactionId, TransactionResult, TransactionType};
 use crate::{Account, Transaction};
+use rust_decimal::Decimal;
 use std::collections::HashMap;
+use DepositState::{Deposited, Disputed};
 use TransactionType::{Chargeback, Dispute, Resolve};
 
 #[derive(Default)]
 pub(crate) struct Ledger {
-    regular_transactions: HashMap<TransactionId, TransactionType>,
+    transactions: HashMap<TransactionId, TransactionType>,
 }
 
 impl Ledger {
@@ -35,49 +39,76 @@ impl Ledger {
         // Any other transaction appearing before the account creation should be considered invalid
         let account = match transaction_type {
             // Get the existing account or create a new one
-            Deposit(_) => accounts.entry(*account_id).or_insert_with(Account::new),
+            Deposit(..) => accounts.entry(*account_id).or_insert_with(Account::new),
             // Get the existing account or fail immediately
             Withdrawal(_) | Dispute | Resolve | Chargeback => accounts
                 .get_mut(account_id)
                 .ok_or(NonExistentAccount(*account_id))?,
         };
 
-        let disputed_amount = self
-            .regular_transactions
-            .get(transaction_id) // Get the transaction type referenced by the dispute/resolve/chargeback
-            .ok_or(NonExistentTransaction(*transaction_id))
-            .and_then(|transaction| {
-                if let Deposit(amount) = transaction {
-                    Ok(amount)
-                } else {
-                    Err(InvalidTransactionReference(*transaction_type, *transaction))
-                }
-            });
+        let mut handle_dispute =
+            |expected: DepositState, new: DepositState, operation: fn(&mut Account, Decimal)| {
+                return self.handle_referential_transaction(
+                    account,
+                    *transaction_id,
+                    *transaction_type,
+                    expected,
+                    new,
+                    operation,
+                );
+            };
 
-        // Any errors that happen during the deposit/withdrawal halt the method execution
-        // before we insert the processed transaction.
         match transaction_type {
-            Deposit(deposit) => {
-                account.deposit(*deposit)?;
-                self.regular_transactions
-                    .insert(*transaction_id, *transaction_type);
+            // No need to check the state of the deposit since it comes from the CSV
+            Deposit(deposit, _) => {
+                account.deposit(*deposit);
+                self.transactions.insert(*transaction_id, *transaction_type);
+                Ok(())
             }
             Withdrawal(withdrawal) => {
-                account.withdraw(*account_id, *transaction_id, *withdrawal)?;
-                self.regular_transactions
-                    .insert(*transaction_id, *transaction_type);
+                if account.available() < *withdrawal {
+                    return Err(InsufficientFunds(*account_id, *transaction_id, *withdrawal));
+                }
+                account.withdraw(*withdrawal);
+                self.transactions.insert(*transaction_id, *transaction_type);
+                Ok(())
             }
-            Dispute => {
-                account.dispute(*transaction_id, *disputed_amount?)?;
-            }
-            Resolve => {
-                account.resolve(*transaction_id, *disputed_amount?)?;
-            }
-            Chargeback => {
-                account.chargeback(*transaction_id, *disputed_amount?)?;
-            }
+            Dispute => handle_dispute(Deposited, Disputed, Account::dispute),
+            Resolve => handle_dispute(Disputed, Resolved, Account::resolve),
+            Chargeback => handle_dispute(Disputed, ChargedBack, Account::chargeback),
         }
+    }
 
-        Ok(())
+    // When dealing with disputes, resolves and chargebacks verify the referenced transaction is
+    // a deposit and in a valid state before adding it to the ledger
+    fn handle_referential_transaction(
+        &mut self,
+        account: &mut Account,
+        transaction_id: TransactionId,
+        transaction_type: TransactionType,
+        expected_state: DepositState,
+        new_state: DepositState,
+        operation: fn(&mut Account, Decimal),
+    ) -> TransactionResult {
+        let reference = self.transactions.get(&transaction_id);
+        match reference {
+            Some(Deposit(amount, state)) if *state == expected_state => {
+                operation(account, *amount);
+                self.transactions
+                    .insert(transaction_id, Deposit(*amount, new_state));
+                Ok(())
+            }
+            Some(Deposit(_, previous_state)) => Err(InvalidDepositTransition(
+                transaction_id,
+                *previous_state,
+                new_state,
+            )),
+            Some(invalid_reference) => Err(InvalidTransactionReference(
+                transaction_id,
+                transaction_type,
+                *invalid_reference,
+            )),
+            None => Err(NonExistentTransaction(transaction_id)),
+        }
     }
 }

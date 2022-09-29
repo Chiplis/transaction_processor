@@ -1,10 +1,5 @@
-use crate::transaction::TransactionFailure::{
-    FinalizedDispute, InsufficientFunds, RedisputedTransaction, UndisputedTransaction,
-};
-use crate::transaction::{TransactionId, TransactionResult};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::fmt;
 use std::fmt::Formatter;
 
@@ -20,8 +15,6 @@ impl fmt::Display for AccountId {
 pub(crate) struct Account {
     available: Decimal,
     held: Decimal,
-    past_disputes: HashSet<TransactionId>,
-    finalized_disputes: HashSet<TransactionId>,
     locked: bool,
 }
 
@@ -33,60 +26,31 @@ impl Account {
     }
 
     // The deposit can never fail, because we're only adding funds to the user's account
-    pub fn deposit(&mut self, deposit: Decimal) -> TransactionResult {
+    pub fn deposit(&mut self, deposit: Decimal) {
         self.available += deposit;
-        Ok(())
     }
 
     // A withdrawal can fail if the user tries to withdraw more funds than they have available
-    pub fn withdraw(
-        &mut self,
-        account_id: AccountId,
-        tx_id: TransactionId,
-        withdraw: Decimal,
-    ) -> TransactionResult {
-        if self.available() < withdraw {
-            return Err(InsufficientFunds(account_id, tx_id, withdraw));
-        }
-        self.available -= withdraw;
-        Ok(())
+    pub fn withdraw(&mut self, withdrawed: Decimal) {
+        self.available -= withdrawed;
     }
 
     // Disputes can only be triggered once
-    pub fn dispute(&mut self, tx_id: TransactionId, disputed: Decimal) -> TransactionResult {
-        if self.past_disputes.contains(&tx_id) {
-            return Err(RedisputedTransaction(tx_id));
-        }
+    pub fn dispute(&mut self, disputed: Decimal) {
         self.available -= disputed;
         self.held += disputed;
-        self.past_disputes.insert(tx_id);
-        Ok(())
     }
 
     // Resolutions can only be triggered on non-finalized transactions, and require a previous dispute to exist
-    pub fn resolve(&mut self, tx_id: TransactionId, resolved: Decimal) -> TransactionResult {
-        if self.finalized_disputes.contains(&tx_id) {
-            return Err(FinalizedDispute(tx_id));
-        } else if !self.past_disputes.contains(&tx_id) {
-            return Err(UndisputedTransaction(tx_id));
-        }
+    pub fn resolve(&mut self, resolved: Decimal) {
         self.available += resolved;
         self.held -= resolved;
-        self.finalized_disputes.insert(tx_id);
-        Ok(())
     }
 
     // Chargebacks can only be triggered on non-finalized transactions, and require a previous dispute to exist
-    pub fn chargeback(&mut self, tx_id: TransactionId, chargeback: Decimal) -> TransactionResult {
-        if self.finalized_disputes.contains(&tx_id) {
-            return Err(FinalizedDispute(tx_id));
-        } else if !self.past_disputes.contains(&tx_id) {
-            return Err(UndisputedTransaction(tx_id));
-        }
-        self.held -= chargeback;
+    pub fn chargeback(&mut self, charged_back: Decimal) {
+        self.held -= charged_back;
         self.locked = true;
-        self.finalized_disputes.insert(tx_id);
-        Ok(())
     }
 
     // Getters to deal with the required decimal precision when generating the output file
