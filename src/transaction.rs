@@ -54,8 +54,6 @@ pub(crate) enum TransactionFailure {
     NonExistentTransaction(TransactionId),
     #[error("{0:?} not found")]
     NonExistentAccount(AccountId),
-    #[error("No previously disputed {0:?} found")]
-    UndisputedTransaction(TransactionId),
     #[error("{0:?} cannot transition from {1:?} to {2:?}")]
     InvalidDepositTransition(TransactionId, DepositState, DepositState),
     // An invalid transaction reference happens if you attempt to dispute/resolve/chargeback a non-deposit transaction

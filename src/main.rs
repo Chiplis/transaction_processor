@@ -196,6 +196,7 @@ mod tests {
                         withdrawal,1,4,1.5
                         withdrawal,2,5,3.0,
                         withdrawal,2,6,1.1,
+                        withdrawal,3,7,1.1,
                         dispute,2,5,
                         dispute,2,6,
                         dispute,1,1,
@@ -227,18 +228,19 @@ mod tests {
             // some funds from the account and then reverted the original funding deposit
             Decimal::from_str_exact("-1.1").unwrap()
         );
-        assert_eq!(errors.len(), 4);
+        assert_eq!(errors.len(), 5);
         assert_eq!(
             errors[0].to_string(),
             "TransactionId(5) for AccountId(2) can't withdraw $3 due to insufficient funds"
         );
-        assert_eq!(errors[1].to_string(), "TransactionId(5) not found");
+        assert_eq!(errors[1].to_string(), "AccountId(3) not found");
+        assert_eq!(errors[2].to_string(), "TransactionId(5) not found");
         assert_eq!(
-            errors[2].to_string(),
+            errors[3].to_string(),
             "Dispute cannot reference TransactionId(6) which is a Withdrawal(1.1)"
         );
         assert_eq!(
-            errors[3].to_string(),
+            errors[4].to_string(),
             "TransactionId(1) cannot transition from Resolved to ChargedBack"
         );
     }
