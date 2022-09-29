@@ -48,14 +48,14 @@ impl Ledger {
 
         let mut handle_dispute =
             |expected: DepositState, new: DepositState, operation: fn(&mut Account, Decimal)| {
-                return self.handle_referential_transaction(
+                self.handle_referential_transaction(
                     account,
                     *transaction_id,
                     *transaction_type,
                     expected,
                     new,
                     operation,
-                );
+                )
             };
 
         match transaction_type {
