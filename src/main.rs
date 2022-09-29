@@ -62,10 +62,10 @@ fn process_csv(mut csv: Reader<impl Read>) -> (HashMap<AccountId, Account>, Vec<
 
 #[cfg(test)]
 mod tests {
-    use crate::{process_csv, Account, AccountId};
+    use crate::{process_csv, AccountId};
     use csv::{ReaderBuilder, Trim};
     use rust_decimal::Decimal;
-    use std::collections::HashMap;
+    
     use std::path::Path;
 
     #[test]
@@ -156,7 +156,7 @@ mod tests {
             Decimal::from_str_exact("0").unwrap()
         );
         assert_eq!(first_account.held(), Decimal::from_str_exact("0").unwrap());
-        assert_eq!(first_account.locked(), true);
+        assert!(first_account.locked());
         assert_eq!(errors.len(), 0);
     }
 
