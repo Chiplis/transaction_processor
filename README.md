@@ -5,7 +5,7 @@ outputs a list of accounts along with their funds' status.
 
 The code takes advantage of Rust's powerful type system to prevent potential parsing errors at compile time.
 The CSV is processed using a best effort strategy, meaning anomalies such as invalid/incorrect data do not cause a crash 
-but instead get collected into a vector of errors which is printed to stderr and can later be analyzed and debugged.
+but instead get collected into a vector of errors which can later be analyzed and debugged.
 
 **Run instructions**
 
