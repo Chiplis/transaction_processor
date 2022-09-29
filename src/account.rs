@@ -1,15 +1,8 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::fmt::Formatter;
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub(crate) struct AccountId(pub u16);
-impl fmt::Display for AccountId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
 
 #[derive(Default, Debug)]
 pub(crate) struct Account {

@@ -31,7 +31,8 @@ fn main() -> Result<(), Error> {
     println!("client,available,held,total,locked");
     accounts.iter().for_each(|(account_id, account)| {
         println!(
-            "{account_id},{},{},{},{}",
+            "{},{},{},{},{}",
+            account_id.0,
             account.available(),
             account.held(),
             account.total(),
