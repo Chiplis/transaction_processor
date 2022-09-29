@@ -26,7 +26,7 @@ fn main() -> Result<(), Error> {
         .flexible(true) // Allows parsing of differently sized rows
         .from_path(Path::new(path))?;
 
-    let (accounts, errors) = process_csv(csv);
+    let (accounts, _) = process_csv(csv);
 
     println!("client,available,held,total,locked");
     accounts.iter().for_each(|(account_id, account)| {
@@ -39,9 +39,6 @@ fn main() -> Result<(), Error> {
             account.locked()
         );
     });
-    for error in errors {
-        eprintln!("{}", error);
-    }
     Ok(())
 }
 
