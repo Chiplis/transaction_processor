@@ -18,29 +18,24 @@ impl Account {
         }
     }
 
-    // The deposit can never fail, because we're only adding funds to the user's account
     pub fn deposit(&mut self, deposit: Decimal) {
         self.available += deposit;
     }
 
-    // A withdrawal can fail if the user tries to withdraw more funds than they have available
     pub fn withdraw(&mut self, withdrawed: Decimal) {
         self.available -= withdrawed;
     }
 
-    // Disputes can only be triggered once
     pub fn dispute(&mut self, disputed: Decimal) {
         self.available -= disputed;
         self.held += disputed;
     }
 
-    // Resolutions can only be triggered on non-finalized transactions, and require a previous dispute to exist
     pub fn resolve(&mut self, resolved: Decimal) {
         self.available += resolved;
         self.held -= resolved;
     }
 
-    // Chargebacks can only be triggered on non-finalized transactions, and require a previous dispute to exist
     pub fn chargeback(&mut self, charged_back: Decimal) {
         self.held -= charged_back;
         self.locked = true;

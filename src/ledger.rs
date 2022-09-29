@@ -65,6 +65,7 @@ impl Ledger {
                 self.transactions.insert(*transaction_id, *transaction_type);
                 Ok(())
             }
+            // A withdrawal can fail if the user tries to withdraw more funds than they have available
             Withdrawal(withdrawal) => {
                 if account.available() < *withdrawal {
                     return Err(InsufficientFunds(*account_id, *transaction_id, *withdrawal));
@@ -73,7 +74,9 @@ impl Ledger {
                 self.transactions.insert(*transaction_id, *transaction_type);
                 Ok(())
             }
+            // Disputes can only be triggered once
             Dispute => handle_dispute(Deposited, Disputed, Account::dispute),
+            // Resolves/Chargebacks can only be triggered on non-finalized transactions, and require a previous dispute to exist
             Resolve => handle_dispute(Disputed, Resolved, Account::resolve),
             Chargeback => handle_dispute(Disputed, ChargedBack, Account::chargeback),
         }
