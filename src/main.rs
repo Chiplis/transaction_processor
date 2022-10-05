@@ -173,18 +173,17 @@ mod tests {
         );
         assert_eq!(
             first_account.total(),
-            Decimal::from_str_exact("1.5001").unwrap()
+            Decimal::from_str_exact("1.5").unwrap()
         );
         assert_eq!(
             second_account.total(),
-            Decimal::from_str_exact("2.1").unwrap()
+            Decimal::from_str_exact("2").unwrap()
         );
-        assert_eq!(errors.len(), 2);
+        assert_eq!(errors.len(), 1);
         assert_eq!(
             errors[0].to_string(),
             "TransactionId(5) for AccountId(2) can't withdraw $3 due to insufficient funds"
         );
-        assert_eq!(errors[1].to_string(), "TransactionId(5) not found");
     }
 
     #[test]
