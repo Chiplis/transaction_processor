@@ -46,17 +46,16 @@ impl Ledger {
                 .ok_or(NonExistentAccount(*account_id))?,
         };
 
-        let mut handle_dispute =
-            |expected: DepositState, new: DepositState, operation: fn(&mut Account, Decimal)| {
-                self.handle_referential_transaction(
-                    account,
-                    *transaction_id,
-                    *transaction_type,
-                    expected,
-                    new,
-                    operation,
-                )
-            };
+        let mut handle_dispute = |expected_state, new_state, operation| {
+            self.handle_referential_transaction(
+                account,
+                *transaction_id,
+                *transaction_type,
+                expected_state,
+                new_state,
+                operation,
+            )
+        };
 
         match transaction_type {
             // No need to check the state of the deposit since it comes from the CSV
@@ -101,9 +100,9 @@ impl Ledger {
                     .insert(transaction_id, Deposit(*amount, new_state));
                 Ok(())
             }
-            Some(Deposit(_, previous_state)) => Err(InvalidDepositTransition(
+            Some(Deposit(_, invalid_previous_state)) => Err(InvalidDepositTransition(
                 transaction_id,
-                *previous_state,
+                *invalid_previous_state,
                 new_state,
             )),
             Some(invalid_reference) => Err(InvalidTransactionReference(
